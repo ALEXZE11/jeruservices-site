@@ -1,0 +1,112 @@
+/* JeruServices — feuille de style commune à toutes les pages */
+:root {
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --ink: #1d2733;
+  --muted: #5b6673;
+  --line: #e6e2da;
+  --brand: #1f5f8b;
+  --brand-ink: #ffffff;
+  --brand-soft: #e8f1f7;
+  --stone: #c9a96e;
+  --wa: #128c4a;
+  --wa-ink: #ffffff;
+  --warn-bg: #fff6e0;
+  --warn-line: #e9c46a;
+  --radius: 14px;
+  --max: 960px;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Hebrew", Arial, sans-serif;
+}
+img, svg { max-width: 100%; display: block; }
+a { color: var(--brand); }
+h1, h2, h3 { line-height: 1.25; margin: 0 0 .5em; }
+h1 { font-size: clamp(1.8rem, 5vw, 2.6rem); }
+h2 { font-size: clamp(1.35rem, 3.6vw, 1.75rem); }
+h3 { font-size: 1.1rem; }
+p { margin: 0 0 1em; }
+
+/* Langues : seul le bloc de la langue choisie est visible */
+html[data-lang="fr"] [data-l]:not([data-l="fr"]),
+html[data-lang="en"] [data-l]:not([data-l="en"]),
+html[data-lang="he"] [data-l]:not([data-l="he"]) { display: none !important; }
+
+.wrap { max-width: var(--max); margin-inline: auto; padding-inline: 16px; }
+
+/* En-tête */
+.top { background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
+.top .wrap { display: flex; align-items: center; gap: 12px; min-height: 60px; flex-wrap: wrap; }
+.logo { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink); font-weight: 700; font-size: 1.15rem; }
+.logo svg { width: 30px; height: 30px; }
+.nav { display: flex; gap: 4px 16px; flex-wrap: wrap; margin-inline-start: auto; font-size: .95rem; }
+.nav a { text-decoration: none; color: var(--muted); padding: 4px 0; }
+.nav a[aria-current="page"] { color: var(--ink); font-weight: 600; border-bottom: 2px solid var(--stone); }
+.langs { display: flex; gap: 4px; }
+.langs button {
+  font: inherit; font-size: .85rem; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+  border-radius: 999px; padding: 3px 10px; min-height: 32px;
+}
+.langs button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+@media (max-width: 620px) {
+  .nav { order: 3; width: 100%; margin-inline-start: 0; padding-bottom: 8px; }
+  .langs { margin-inline-start: auto; }
+}
+
+/* Sections */
+.hero { padding: 48px 0 40px; background: linear-gradient(180deg, var(--brand-soft), var(--bg)); }
+.hero p.lead { font-size: 1.15rem; color: var(--muted); max-width: 40em; }
+section { padding: 32px 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
+.steps li { counter-increment: s; position: relative; padding-inline-start: 52px; }
+.steps li::before {
+  content: counter(s); position: absolute; inset-inline-start: 0; top: 0;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--brand); color: var(--brand-ink); font-weight: 700;
+  display: grid; place-items: center;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0 0 1em; list-style: none; }
+.chips li { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 14px; }
+
+.notice { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: var(--radius); padding: 16px 20px; }
+
+/* Boutons */
+.btn {
+  display: inline-flex; align-items: center; gap: 10px; justify-content: center;
+  font: inherit; font-weight: 600; text-decoration: none; cursor: pointer;
+  border-radius: 999px; padding: 12px 22px; min-height: 48px; border: 0;
+}
+.btn svg { width: 22px; height: 22px; flex: none; }
+.btn-wa { background: var(--wa); color: var(--wa-ink); }
+.btn-wa[aria-disabled="true"] { background: #8a9a90; cursor: not-allowed; }
+.btn-alt { background: var(--surface); color: var(--brand); border: 2px solid var(--brand); }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.small { font-size: .9rem; color: var(--muted); }
+
+/* Zones détaillées */
+.zones h3 { color: var(--brand); }
+.zones ul { margin: 0; padding-inline-start: 1.2em; }
+
+/* Texte long (confidentialité) */
+.prose { max-width: 720px; }
+.prose h2 { margin-top: 1.4em; font-size: 1.25rem; }
+
+/* Pied de page */
+.foot { border-top: 1px solid var(--line); background: var(--surface); padding: 24px 0; margin-top: 24px; font-size: .92rem; color: var(--muted); }
+.foot .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+.foot a { color: var(--muted); }
+
+/* Hébreu : lecture de droite à gauche (le reste est géré par les propriétés logiques) */
+html[dir="rtl"] body { font-family: "Noto Sans Hebrew", "Segoe UI", Arial, sans-serif; }
