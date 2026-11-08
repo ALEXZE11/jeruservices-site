@@ -107,6 +107,36 @@
       '<div class="l2"><span dir="auto">' + esc(d.Quartier) + '</span> · ' + esc(d.Heures) + ' h · <span dir="auto">' + esc(c.nom || d['ID client']) + '</span></div>' +
       '<div class="etat c-' + esc(d.Statut) + (passe ? ' urgent' : '') + '">' + (passe ? '⚠ date passée · ' : '') + esc(etat) + '</div></button>';
   }
+  // ---------- Séries (demandes régulières) ----------
+  var PAS = { 'Hebdomadaire': 7, 'Toutes les 2 semaines': 14, 'Mensuel': 28 };
+  function serie(sref) {
+    var occ = E.demandes.filter(function (x) { return x['Série'] === sref; }).sort(function (a, b) { return (jourDe(a['Date souhaitée']) || 0) - (jourDe(b['Date souhaitée']) || 0); });
+    var o = demande(sref) || occ[0] || {};
+    var avecK = occ.filter(function (x) { return x['Cleaner attribué'] && (x.Statut === 'Attribuée' || x.Statut === 'Clôturée'); });
+    var kid = (E.series_cleaner || {})[sref] || (avecK.length ? avecK[avecK.length - 1]['Cleaner attribué'] : '');
+    var a = auj(), avenir = occ.filter(function (x) { return ACTIFS.indexOf(x.Statut) >= 0 && jourDe(x['Date souhaitée']) >= a; });
+    var n = jourDe(o['Date souhaitée']);
+    var rythme = { 'Hebdomadaire': 'tous les ', 'Toutes les 2 semaines': 'un ', 'Mensuel': 'un ' }[o['Fréquence']] || '';
+    var jourTxt = n !== null ? JFR[wd(n)] : '';
+    var libelle = o['Fréquence'] === 'Hebdomadaire' ? 'Tous les ' + jourTxt + 's' : o['Fréquence'] === 'Toutes les 2 semaines' ? 'Un ' + jourTxt + ' sur deux' : 'Un ' + jourTxt + ' toutes les 4 semaines';
+    return { o: o, occ: occ, avenir: avenir, cleaner: cleaner(kid), etat: o['État série'] || 'active', libelle: libelle };
+  }
+  function blocSerie(d) {
+    var S = serie(d['Série']), e = S.etat;
+    var etatTxt = { active: '🟢 active', pause: '⏸ en pause', 'arrêtée': '⏹ arrêtée' }[e] || e;
+    var h = '<div class="bloc"><h2>🔁 Série ' + esc(d['Série']) + ' · ' + esc(S.libelle) + '</h2>' + lignes([
+      ['État', esc(etatTxt)],
+      ['Cleaner', S.cleaner ? esc(S.cleaner.nom) : 'pas encore attribuée (aucune séance créée avant attribution)'],
+      ['Séances', S.occ.length + ' au total · ' + S.avenir.length + ' à venir'],
+      ['Prochaine', S.avenir[0] ? esc(S.avenir[0]['Date souhaitée'] + ' (Ref ' + S.avenir[0].Ref + ')') : '—']
+    ]) + '<p class="note">Une fois attribuée, chaque séance suivante est créée 7 jours avant, avec le même cleaner, sans nouvelle annonce.</p><div class="actions">';
+    if (e === 'active') h += '<button class="btn" data-a="serie_etat" data-x="pause">⏸ Mettre en pause</button>';
+    else if (e === 'pause') h += '<button class="btn principal" data-a="serie_etat" data-x="active">▶ Reprendre</button>';
+    else h += '<button class="btn" data-a="serie_etat" data-x="active">▶ Relancer la série</button>';
+    if (e !== 'arrêtée') h += '<button class="btn danger" data-a="serie_etat" data-x="arrêtée">⏹ Arrêter</button>';
+    h += '<button class="btn large" data-a="serie_cleaner">👤 Changer le cleaner pour toutes les séances suivantes</button></div></div>';
+    return h;
+  }
   function lignes(paires) { return paires.filter(function (p) { return p[1]; }).map(function (p) { return '<div class="ligne"><span class="k">' + p[0] + '</span><span class="v" dir="auto">' + p[1] + '</span></div>'; }).join(''); }
   function compteurs() {
     var a = auj(), D = E.demandes;
@@ -168,6 +198,7 @@
         ['Tarifs', esc((d['Tarif client (₪/h)'] || E.tarifs.client) + ' ₪/h client · ' + (d['Payé cleaner (₪/h)'] || E.tarifs.cleaner) + ' ₪/h cleaner')],
         ['Notes', esc(d.Notes)]
       ]) + '</div>';
+      if (d['Série']) h += blocSerie(d);
       h += '<div class="actions">';
       if (st === 'Nouvelle') h += '<button class="btn principal large" data-a="partager" data-x="' + d.Ref + '">📣 Partager l’annonce</button><button class="btn" data-a="statut" data-x="Annoncée">✅ Publiée</button><button class="btn" data-a="attribuer" data-x="' + d.Ref + '">👤 Attribuer</button>';
       else if (st === 'Annoncée') h += '<button class="btn principal large" data-a="attribuer" data-x="' + d.Ref + '">👤 Attribuer un cleaner</button><button class="btn" data-a="partager" data-x="' + d.Ref + '">📣 Re-partager</button><button class="btn" data-a="statut" data-x="Nouvelle">↩ Pas publiée</button>';
@@ -176,13 +207,13 @@
       h += '<button class="btn" data-a="maps">📍 Maps</button>';
       if (ACTIFS.indexOf(st) >= 0) h += '<button class="btn" data-a="decaler" data-x="' + d.Ref + '">📅 Décaler</button><button class="btn" data-a="rereserver" data-x="' + d.Ref + '">🔁 Re-réserver</button><button class="btn danger" data-a="annuler">🔴 Annuler</button>';
       if (j.length) h += '<button class="btn large" data-a="erreur">↩ Annuler la dernière action (« ' + esc(j[j.length - 1][3]) + ' »)</button>';
-      h += '<button class="btn large" data-a="carte">💬 Renvoyer la carte dans le bot</button></div>';
+      h += '<button class="btn large" data-a="carte">📩 M’envoyer cette carte</button><p class="note">Envoie une copie de cette carte dans votre conversation avec le bot (à vous seul).</p></div>';
       h += '<div class="bloc" style="margin-top:10px"><h2>Historique</h2>' + (j.length ? j.slice().reverse().map(function (x) { return '<div class="histo"><b>' + esc(x[3]) + '</b> · ' + esc(x[0].slice(0, 16)) + ' · ' + esc(x[1]) + '<br><span class="note">' + esc(x[4]) + ' : ' + esc(x[5] || '—') + ' → ' + esc(x[6] || '—') + '</span></div>'; }).join('') : '<p class="note">Reçue le ' + esc(d['Reçue le']) + '. Aucune modification depuis.</p>') + '</div>';
       app.innerHTML = h;
     },
     attribuer: function () {
       var d = demande(vue.r); if (!d) return VUES.fiche();
-      cadre('Attribuer · Ref ' + d.Ref);
+      cadre((vue.serie ? 'Cleaner de la série · Ref ' : 'Attribuer · Ref ') + d.Ref);
       var n = jourDe(d['Date souhaitée']), jour = n !== null ? JFR[wd(n)] : '', zone = zoneDe(d.Quartier), cl = client(d['ID client']);
       var liste = E.cleaners.map(function (k) {
         var r = [], s = 0, zs = (k.zones || '').toLowerCase(), dispo = (k.dispo || '').toLowerCase(), cr = (k.creneaux || '').toLowerCase();
@@ -196,7 +227,7 @@
         if (occupe) { s -= 3; r.push(['ko', 'déjà pris sur ce créneau']); }
         return { k: k, s: s, r: r, nb: nb };
       }).sort(function (a, b) { return b.s - a.s || b.nb - a.nb; });
-      function ligne(x) { var k = x.k, actuel = d['Cleaner attribué'] === k.id; return '<div class="bloc"><div class="l1" style="display:flex;justify-content:space-between"><b dir="auto">' + esc(k.nom) + '</b><span class="note">' + x.nb + ' mission(s)</span></div><div>' + x.r.map(function (y) { return '<span class="raison ' + y[0] + '">' + esc(y[1]) + '</span>'; }).join('') + '</div><div class="actions" style="margin-top:8px">' + (actuel ? '<span class="btn">✔ Attribuée</span>' : '<button class="btn principal" data-a="choisir" data-x="' + esc(k.id) + '">Attribuer</button>') + (k.tel ? '<button class="btn" data-a="ouvrir" data-x="' + esc(wa(k.tel, '')) + '">💬 WhatsApp</button>' : '') + '</div></div>'; }
+      function ligne(x) { var k = x.k, actuel = d['Cleaner attribué'] === k.id; return '<div class="bloc"><div class="l1" style="display:flex;justify-content:space-between"><b dir="auto">' + esc(k.nom) + '</b><span class="note">' + x.nb + ' mission(s)</span></div><div>' + x.r.map(function (y) { return '<span class="raison ' + y[0] + '">' + esc(y[1]) + '</span>'; }).join('') + '</div><div class="actions" style="margin-top:8px">' + (actuel && !vue.serie ? '<span class="btn">✔ Attribuée</span>' : '<button class="btn principal" data-a="choisir" data-x="' + esc(k.id) + '">' + (vue.serie ? 'Pour toute la série' : 'Attribuer') + '</button>') + (k.tel ? '<button class="btn" data-a="ouvrir" data-x="' + esc(wa(k.tel, '')) + '">💬 WhatsApp</button>' : '') + '</div></div>'; }
       var act = liste.filter(function (x) { return x.k.actif; }), ina = liste.filter(function (x) { return !x.k.actif; });
       app.innerHTML = '<p class="note">' + esc(d.Quartier) + (zone ? ' (' + esc(zone) + ')' : '') + ' · ' + esc(quandCourt(d)) + ' ' + esc((d['Créneau'] || '').toLowerCase()) + ' · ' + esc(d['Intervenant souhaité']) + '. Triés par pertinence : personne n’est écarté.</p>' +
         (act.length ? act.map(ligne).join('') : '<p class="vide">Aucun cleaner actif.</p>') + (ina.length ? '<div class="groupe">Inactifs (' + ina.length + ')</div>' + ina.map(ligne).join('') : '');
@@ -208,9 +239,10 @@
       if (!m) { app.innerHTML = '<p class="vide">Textes indisponibles pour cette demande (trop ancienne ou annulée).</p>'; return; }
       function bloc(titre, tel, texte, note) { return '<div class="bloc"><h2>' + titre + '</h2>' + (note ? '<p class="note">' + note + '</p>' : '') + '<div class="texte-msg" dir="auto">' + esc(texte) + '</div><div class="actions"><button class="btn principal" data-a="ouvrir" data-x="' + esc(wa(tel, texte)) + '">Ouvrir WhatsApp</button><button class="btn" data-a="copier" data-x="' + esc(texte) + '">Copier</button></div></div>'; }
       var h = '';
-      if (d.Statut === 'Nouvelle' || d.Statut === 'Annoncée') h += bloc('📣 Annonce (FR + EN) pour votre chaîne', '', m.annonce, 'WhatsApp s’ouvre : choisissez votre chaîne ou un groupe. Si la chaîne n’apparaît pas, utilisez « Copier » puis collez dans la chaîne. Jamais d’adresse dans l’annonce.') + (d.Statut === 'Nouvelle' ? '<button class="btn large" data-a="statut" data-x="Annoncée" style="margin-bottom:10px">✅ C’est publié</button>' : '');
-      if (k) h += bloc('📤 Fiche mission à ' + esc(k.nom.split(' ')[0]), m.fiche.tel, m.fiche.texte, 'Contient l’adresse complète et le contact du client : à envoyer seulement au cleaner choisi.');
-      h += bloc('💬 Confirmation au client' + (c.nom ? ' (' + esc(c.nom) + ')' : ''), m.confirmation.tel, m.confirmation.texte, k ? '' : 'Aucun cleaner attribué : le prénom du cleaner manque encore.');
+      if (d.Statut === 'Nouvelle' || d.Statut === 'Annoncée') h += bloc('📣 À votre chaîne de cleaners · annonce FR + EN', '', m.annonce, 'WhatsApp s’ouvre : choisissez votre chaîne ou un groupe. Si la chaîne n’apparaît pas, utilisez « Copier » puis collez dans la chaîne. Jamais d’adresse dans l’annonce.') + (d.Statut === 'Nouvelle' ? '<button class="btn large" data-a="statut" data-x="Annoncée" style="margin-bottom:10px">✅ C’est publié</button>' : '');
+      if (k) h += bloc('📤 Au cleaner choisi (' + esc(k.nom.split(' ')[0]) + ') · fiche mission', m.fiche.tel, m.fiche.texte, 'Adresse, accès et prénom du client seulement : ni son téléphone ni son nom de famille. Pour toute question, le cleaner contacte JeruServices.');
+      if (k) h += bloc('💬 Au client' + (c.nom ? ' (' + esc(c.nom) + ')' : '') + ' · confirmation', m.confirmation.tel, m.confirmation.texte, 'Donne seulement le prénom du cleaner.');
+      else if (d.Statut !== 'Nouvelle' && d.Statut !== 'Annoncée') h += '<p class="note">La confirmation au client sera disponible une fois un cleaner attribué.</p>';
       app.innerHTML = h;
     },
     decaler: function () {
@@ -236,6 +268,8 @@
         '<label class="champ">Bâtiment, étage, accès (facultatif)</label><input class="champ" id="complement" dir="auto" value="' + esc(f.complement || '') + '">' +
         '<label class="champ">Date</label><input class="champ" id="date" type="date" value="' + esc(f.date || '') + '">' +
         '<label class="champ">Créneau</label>' + choix('creneau', E.listes.creneaux) +
+        '<label class="champ">Heure précise (facultatif)</label><input class="champ" id="heure" type="time" value="' + esc(f.heure || '') + '">' +
+        ((E.types_lieu || []).length ? '<label class="champ">Type de lieu</label>' + choix('lieu', E.types_lieu) : '') +
         '<label class="champ">Durée</label><div class="stepper"><button data-a="heures" data-x="-1">−</button><b>' + f.heures + ' h</b><button data-a="heures" data-x="1">＋</button></div>' +
         '<label class="champ">Intervenant</label>' + choix('intervenant', E.listes.intervenants) +
         '<label class="champ">Fréquence</label>' + choix('frequence', E.listes.frequences) +
@@ -243,7 +277,7 @@
         '<label class="champ">Notes (facultatif)</label><textarea class="champ" id="notes" rows="2" dir="auto">' + esc(f.notes || '') + '</textarea>' +
         '<div id="err" class="erreur"></div><button class="btn principal" style="margin-top:12px;width:100%" data-a="creer">Créer la demande</button></div>';
       app.innerHTML = h;
-      ['tel', 'nom', 'quartier', 'adresse', 'complement', 'date', 'notes'].forEach(function (id) { var el = $('#' + id); if (!el) return; el.oninput = function () { f[id === 'tel' ? 'telephone' : id] = el.value; if (id === 'quartier') listeQ(); if (id === 'date' || id === 'quartier') verif(); }; });
+      ['tel', 'nom', 'quartier', 'adresse', 'complement', 'date', 'notes', 'heure'].forEach(function (id) { var el = $('#' + id); if (!el) return; el.oninput = function () { f[id === 'tel' ? 'telephone' : id] = el.value; if (id === 'quartier') listeQ(); if (id === 'date' || id === 'quartier') verif(); }; });
       var t = $('#tel'); t.onchange = function () { f.telephone = t.value; var c = E.clients.filter(function (x) { return x.tel && x.tel === normTel(t.value); })[0]; if (c) preremplir(f, c); VUES.nouvelle(); lier(); };
       function listeQ() { var q = (f.quartier || '').toLowerCase(), box = $('#qliste'); var ok = E.quartiers.some(function (x) { return x.q === f.quartier; }); if (!q || ok) { box.innerHTML = ''; return; } var l = E.quartiers.filter(function (x) { return x.q.toLowerCase().indexOf(q) >= 0; }).slice(0, 8); box.innerHTML = l.length ? '<div class="liste-q">' + l.map(function (x) { return '<button data-a="q" data-x="' + esc(x.q) + '">' + esc(x.q) + ' <span class="note">' + esc(x.zone) + '</span></button>'; }).join('') + '</div>' : '<p class="erreur">Quartier inconnu : choisissez dans la liste.</p>'; lier(); }
       function verif() { var v = String(f.date || '').split('-'); var k = v.length === 3 ? Math.round(Date.UTC(+v[0], +v[1] - 1, +v[2]) / 86400000) : null; var e = f.date ? controleDate(k, f.creneau) : null; $('#err').textContent = e ? '⚠ ' + e : ''; }
@@ -286,7 +320,17 @@
     },
     plus: function () {
       cadre('Plus');
-      app.innerHTML = '<div class="actions"><button class="btn" data-a="aller" data-x="chiffres">📈 Chiffres</button><button class="btn" data-a="aller" data-x="aide">❓ Les 5 gestes</button><button class="btn large" data-a="aller" data-x="reglages">⚙ Réglages</button></div>';
+      app.innerHTML = '<div class="actions"><button class="btn" data-a="aller" data-x="series">🔁 Séries</button><button class="btn" data-a="aller" data-x="chiffres">📈 Chiffres</button><button class="btn" data-a="aller" data-x="aide">❓ Les 5 gestes</button><button class="btn large" data-a="aller" data-x="reglages">⚙ Réglages</button></div>';
+    },
+    series: function () {
+      cadre('Séries (clients réguliers)');
+      var origines = E.demandes.filter(function (d) { return d['Série'] && d['Série'] === d.Ref; });
+      var ordre = { active: 0, pause: 1, 'arrêtée': 2 };
+      origines.sort(function (a, b) { return (ordre[a['État série'] || 'active'] || 0) - (ordre[b['État série'] || 'active'] || 0); });
+      app.innerHTML = '<p class="note">Une demande « Hebdomadaire », « Toutes les 2 semaines » ou « Mensuel » crée une série. Touchez-en une pour la gérer.</p>' + (origines.length ? origines.map(function (o) {
+        var S = serie(o.Ref), c = client(o['ID client']);
+        return '<button class="carte s-' + (S.etat === 'active' ? 'Attribuée' : 'Clôturée') + '" data-a="fiche" data-x="' + esc((S.avenir[0] || o).Ref) + '"><div class="l1"><span dir="auto">' + esc(c.nom || o['ID client']) + '</span><span class="note">série ' + esc(o.Ref) + '</span></div><div class="l2">' + esc(S.libelle) + ' · ' + esc(o.Quartier) + ' · ' + esc(S.cleaner ? S.cleaner.nom : 'sans cleaner') + '</div><div class="etat">' + esc({ active: 'active', pause: 'en pause', 'arrêtée': 'arrêtée' }[S.etat] || S.etat) + ' · ' + S.avenir.length + ' à venir</div></button>';
+      }).join('') : '<p class="vide">Aucune série pour l’instant.</p>');
     },
     chiffres: function () {
       cadre('Chiffres (estimés)');
@@ -299,7 +343,7 @@
     },
     aide: function () {
       cadre('Les 5 gestes');
-      var g = [['📋', 'Une demande arrive', 'Une carte s’affiche dans le bot et ici. Elle se met à jour toute seule : pas de nouveaux messages à chaque clic.'], ['📣', 'Partager l’annonce', 'WhatsApp s’ouvre avec l’annonce FR + EN prête. Choisissez votre chaîne, envoyez, puis appuyez sur « Publiée ».'], ['👤', 'Attribuer', 'Choisissez le cleaner parmi la liste triée (zone, jour, créneau). Personne n’est écarté.'], ['📤', 'Fiche mission et confirmation', 'Envoyez en un geste l’adresse, le lien Maps et le contact au cleaner, puis la confirmation au client.'], ['📌', 'Savoir où vous en êtes', 'Le point épinglé du bot et les compteurs ici. Le bot ne sonne que pour l’essentiel, jamais la nuit ni pendant Chabbat.']];
+      var g = [['📋', 'Une demande arrive', 'Une carte s’affiche dans le bot et ici. Elle se met à jour toute seule : pas de nouveaux messages à chaque clic.'], ['📣', 'Partager l’annonce', 'WhatsApp s’ouvre avec l’annonce FR + EN prête. Choisissez votre chaîne, envoyez, puis appuyez sur « Publiée ».'], ['👤', 'Attribuer', 'Choisissez le cleaner parmi la liste triée (zone, jour, créneau). Personne n’est écarté.'], ['📤', 'Fiche mission et confirmation', 'Envoyez au cleaner l’adresse, l’accès et le prénom du client (jamais son téléphone : vous restez l’intermédiaire), puis la confirmation au client.'], ['📌', 'Savoir où vous en êtes', 'Le point épinglé du bot et les compteurs ici. Le bot ne sonne que pour l’essentiel, jamais la nuit ni pendant Chabbat.']];
       app.innerHTML = '<div class="bloc">' + g.map(function (x) { return '<div class="geste"><span>' + x[0] + '</span><div><b>' + x[1] + '</b><br><span class="note">' + x[2] + '</span></div></div>'; }).join('') + '</div><p class="note">Une erreur ? Dans la fiche : « Annuler la dernière action ». Un client qui décale : « Décaler ». Un habitué : « Re-réserver ».</p>';
     },
     reglages: function () {
@@ -329,18 +373,20 @@
     copier: function (x) { copier(x); },
     maps: function () { var d = demande(vue.r); ouvrir(d['Lien Maps'] || (d['Position GPS'] ? 'https://www.google.com/maps/search/?api=1&query=' + d['Position GPS'] : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(d['Adresse complète'] + ', Jerusalem'))); },
     statut: function (x) { var d = demande(vue.r); agir('statut', { ref: d.Ref, statut: x, v: d['Modifié le'] }); },
-    choisir: function (x) { var d = demande(vue.r); agir('attribuer', { ref: d.Ref, cleaner: x, v: d['Modifié le'] }, function () { pile.push({ v: 'fiche', r: d.Ref }); vue = { v: 'partager', r: d.Ref }; afficher(); }); },
+    choisir: function (x) { var d = demande(vue.r); if (vue.serie) return agir('serie_cleaner', { ref: d.Ref, cleaner: x, v: d['Modifié le'] }, function () { retour(); }); agir('attribuer', { ref: d.Ref, cleaner: x, v: d['Modifié le'] }, function () { pile.push({ v: 'fiche', r: d.Ref }); vue = { v: 'partager', r: d.Ref }; afficher(); }); },
     desister: function () { var d = demande(vue.r); confirmer('Le cleaner se désiste : retirer ' + ((cleaner(d['Cleaner attribué']) || {}).nom || '') + ' de la Ref ' + d.Ref + ' ? La demande repasse « Annoncée ».', function () { agir('desattribuer', { ref: d.Ref, v: d['Modifié le'] }, function () { vue = { v: 'attribuer', r: d.Ref }; afficher(); }); }); },
     annuler: function () { var d = demande(vue.r); confirmer('Annuler la demande Ref ' + d.Ref + ' (' + d['Date souhaitée'] + ', ' + d.Quartier + ') ?', function () { agir('annuler', { ref: d.Ref, v: d['Modifié le'] }); }); },
     erreur: function () { var d = demande(vue.r); var j = journalDe(d.Ref); confirmer('Annuler « ' + j[j.length - 1][3] + ' » ?', function () { agir('erreur', { ref: d.Ref, v: d['Modifié le'] }); }); },
     carte: function () { var d = demande(vue.r); agir('carte', { ref: d.Ref }); },
+    serie_etat: function (x) { var d = demande(vue.r); var faire = function () { agir('serie_etat', { ref: d.Ref, etat: x, v: d['Modifié le'] }); }; if (x === 'arrêtée') confirmer('Arrêter la série ' + d['Série'] + ' ? Plus aucune séance ne sera créée (celles déjà créées restent).', faire); else faire(); },
+    serie_cleaner: function () { aller({ v: 'attribuer', r: vue.r, serie: true }); },
     cr: function (x) { vue.cr = x; VUES.decaler(); lier(); },
     valider_decalage: function () { var d = demande(vue.r); var di = $('#date').value; if (!di) return toast('Choisissez une date', true); agir('decaler', { ref: d.Ref, date: di, creneau: vue.cr, v: d['Modifié le'] }, function () { retour(); }); },
     champ: function (x) { var i = x.indexOf('|'); vue.f[x.slice(0, i)] = x.slice(i + 1); VUES.nouvelle(); lier(); },
     heures: function (x) { vue.f.heures = Math.max(2, Math.min(8, (vue.f.heures || 3) + Number(x))); VUES.nouvelle(); lier(); },
     q: function (x) { vue.f.quartier = x; VUES.nouvelle(); lier(); },
     creer: function (x, el) {
-      var f = vue.f; var args = { telephone: f.telephone, nom: f.nom, quartier: f.quartier, adresse: f.adresse, complement: f.complement, date: f.date, creneau: f.creneau, heures: f.heures, intervenant: f.intervenant, frequence: f.frequence, flexibilite: f.flexibilite, notes: f.notes, ref_origine: vue.ref_origine || '' };
+      var f = vue.f; var args = { telephone: f.telephone, nom: f.nom, quartier: f.quartier, adresse: f.adresse, complement: f.complement, date: f.date, creneau: f.creneau, heures: f.heures, intervenant: f.intervenant, frequence: f.frequence, flexibilite: f.flexibilite, notes: f.notes, heure: f.heure || '', lieu: f.lieu || '', ref_origine: vue.ref_origine || '' };
       el.disabled = true; el.textContent = 'Envoi…';
       agir('nouvelle', args, function (r) { pile = []; vue = { v: 'accueil' }; api('etat').then(function () { afficher(); }); }).then(function (r) { if (!r || !r.ok) { el.disabled = false; el.textContent = 'Créer la demande'; } });
     },
