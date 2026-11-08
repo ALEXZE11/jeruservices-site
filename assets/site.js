@@ -3,12 +3,13 @@
 var JERU = {
   // Numéro WhatsApp au format international, chiffres seulement (ex. "972501234567").
   // VIDE = numéro pas encore connu : les boutons WhatsApp affichent « bientôt disponible ».
-  whatsapp: "",
+  // Numéro provisoire +1 807-790-4127 (en attendant la vérification de l'entreprise par Meta ; +1 555 en réserve).
+  whatsapp: "18077904127",
   // Langues proposées dans le sélecteur. Ajouter "he" quand la traduction hébraïque est prête et relue.
   langues: ["fr", "en"],
   // Message pré-rempli dans WhatsApp, par langue.
   messageWhatsapp: {
-    fr: "Bonjour, je voudrais réserver un ménage.",
+    fr: "Bonjour ! Je souhaite réserver un ménage",
     en: "Hello, I would like to book a cleaning.",
     he: "שלום, אני רוצה להזמין ניקיון."
   }
