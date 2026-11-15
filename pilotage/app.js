@@ -340,7 +340,21 @@
     },
     plus: function () {
       cadre('Plus');
-      app.innerHTML = '<div class="actions"><button class="btn" data-a="aller" data-x="series">🔁 Séries</button><button class="btn" data-a="aller" data-x="chiffres">📈 Chiffres</button><button class="btn" data-a="aller" data-x="aide">❓ Les 5 gestes</button><button class="btn large" data-a="aller" data-x="reglages">⚙ Réglages</button></div>';
+      var nc = (E.contacts || []).length;
+      app.innerHTML = '<div class="actions"><button class="btn large' + (nc ? ' principal' : '') + '" data-a="aller" data-x="contacts">📥 Contacts sans réservation (' + nc + ')</button><button class="btn" data-a="aller" data-x="series">🔁 Séries</button><button class="btn" data-a="aller" data-x="chiffres">📈 Chiffres</button><button class="btn" data-a="aller" data-x="aide">❓ Les 5 gestes</button><button class="btn large" data-a="aller" data-x="reglages">⚙ Réglages</button></div>';
+    },
+    // Personnes qui ont écrit au WhatsApp de l'entreprise (14 derniers jours) et n'ont pas réservé
+    contacts: function () {
+      cadre('Contacts sans réservation');
+      var l = E.contacts || [];
+      function quand(ms) { try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(ms)); } catch (e) { return ''; } }
+      app.innerHTML = '<p class="note">Ces personnes ont écrit au WhatsApp de l’entreprise et n’ont pas réservé. Écrivez-leur depuis votre WhatsApp, puis touchez « ✓ Traité ». Le bot leur envoie une seule relance automatique, quelques heures après leur message.</p>' +
+        (l.length ? l.map(function (c) {
+          return '<div class="bloc"><div class="l1" style="display:flex;justify-content:space-between"><b dir="auto">' + esc(c.nom || 'Sans nom') + (c.test ? ' (test)' : '') + '</b><span class="note">' + esc(quand(c.dernier)) + '</span></div>' +
+            '<div class="note">+' + esc(c.wa) + (c.relance ? ' · relance automatique envoyée' : '') + (c.accuse ? ' · a écrit plusieurs messages' : '') + '</div>' +
+            (c.texte ? '<div class="texte-msg" dir="auto">' + esc(c.texte) + '</div>' : '<p class="note">Premier message non gardé (contact d’avant le 16/11).</p>') +
+            '<div class="actions" style="margin-top:8px"><button class="btn principal" data-a="ouvrir" data-x="' + esc(wa(c.wa, '')) + '">💬 Lui écrire</button><button class="btn" data-a="contact_traite" data-x="' + esc(c.wa) + '">✓ Traité</button></div></div>';
+        }).join('') : '<p class="vide">Aucun contact en attente.</p>');
     },
     series: function () {
       cadre('Séries (clients réguliers)');
@@ -397,6 +411,7 @@
       if (b.w) { var q = new URLSearchParams(b.w.split('?')[1] || ''); aller({ v: q.get('v') || 'fiche', r: q.get('r') || d.Ref }); }
     },
     envoyer: function (x) { var i = x.indexOf('|'), d = demande(vue.r); if (d) noter(d.Ref, x.slice(0, i)); ouvrir(x.slice(i + 1)); },
+    contact_traite: function (x) { agir('contact_traite', { wa: x }); },
     habituel: function (x) { var c = client(vue.id); agir('client_habituel', { id: c.id, cleaner: x }); },
     copier: function (x) { copier(x); },
     maps: function () { var d = demande(vue.r); ouvrir(d['Lien Maps'] || (d['Position GPS'] ? 'https://www.google.com/maps/search/?api=1&query=' + d['Position GPS'] : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(d['Adresse complète'] + ', Jerusalem'))); },
