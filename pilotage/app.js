@@ -55,7 +55,8 @@
   function api(action, args) {
     var t = performance.now();
     var corps = new URLSearchParams(); corps.set('p', JSON.stringify({ initData: initData, action: action, args: args || {} }));
-    return fetch(API, { method: 'POST', body: corps }).then(function (r) { return r.json(); }).then(function (j) {
+    return fetch(API, { method: 'POST', body: corps }).then(function (r) { return r.text(); }).then(function (txt) {
+      var j = JSON.parse(txt); j._octets = txt.length;
       j._ms = Math.round(performance.now() - t);
       if (j.etat) poser(j.etat); else if (action === 'etat' && j.ok) poser(j);
       if (j.conflit) { toast(j.erreur, true); afficher(); }
@@ -456,6 +457,6 @@
     if (!r.ok) { app.innerHTML = '<div class="bloc"><b>' + esc(r.erreur || 'Accès refusé') + '</b></div>'; return; }
     window.__ms = r._ms; window.__ouverture = Math.round(performance.now() - T0);
     if (v0 === 'rereserver' && !cache) ACTIONS.rereserver(r0); else if (vue.v !== 'nouvelle') afficher();
-    setTimeout(function () { api('mesure', { ouverture_ms: window.__ouverture, api_ms: r._ms, cache: !!cache, ua: navigator.userAgent.slice(0, 120) }); }, 400);
+    setTimeout(function () { api('mesure', { ouverture_ms: window.__ouverture, api_ms: r._ms, octets: r._octets, cache: !!cache, ua: navigator.userAgent.slice(0, 120) }); }, 400);
   }, function () { if (!E) app.innerHTML = '<div class="bloc"><b>Pas de connexion au serveur.</b><p class="note">Vérifiez Internet puis rouvrez. Les boutons du bot fonctionnent toujours.</p></div>'; else toast('Hors ligne : affichage de la dernière version connue', true); });
 })();
