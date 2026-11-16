@@ -416,7 +416,7 @@
     },
     reglages: function () {
       cadre('Réglages');
-      var h = '<div class="bloc"><h2>Sonneries du bot</h2><p class="note">Le bot sonne seulement pour : une nouvelle demande, un message de client (en journée) et l’alerte de 18 h (demain sans cleaner). Le point de situation ne sonne jamais. Rien ne sonne de 21 h à 8 h ni pendant Chabbat et les fêtes : les messages des clients arrivent alors au point de 8 h.</p></div>';
+      var h = '<div class="bloc"><h2>Sonneries du bot</h2><p class="note">Le bot sonne pour : une nouvelle demande, un message de client qui demande votre réponse et les alertes (sans cleaner, demande non traitée). Le point de situation ne sonne jamais. De 21 h à 8 h et pendant Chabbat et les fêtes, tout arrive quand même tout de suite, mais sans sonnerie.</p></div>';
       if (estAdmin(true)) h += '<div class="bloc"><h2>Administration</h2><div class="actions"><button class="btn large" data-a="vueami">' + (vueAmi ? '👁 Revenir en vue admin' : '👁 Voir comme l’ami (vue gérant)') + '</button>' + (estAdmin() ? '<button class="btn" data-a="recharger">↻ Recharger</button>' : '') + '</div>' + (estAdmin() ? '<p class="note">Connecté : ' + esc(E.moi.nom) + ' (' + esc(E.moi.role) + ') · dernière réponse ' + (window.__ms || '?') + ' ms · ouverture ' + (window.__ouverture || '?') + ' ms</p>' : '') + '</div>';
       app.innerHTML = h;
     }
