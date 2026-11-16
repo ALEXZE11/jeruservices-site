@@ -22,6 +22,7 @@
   function toast(msg, ko) { var t = document.getElementById('toast'); t.textContent = msg; t.className = ko ? 'ko' : ''; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(function () { t.hidden = true; }, ko ? 4500 : 2600); vibre(ko ? 'ko' : 'ok'); }
   function ouvrir(url) { if (!url) return; if (tg && tg.openLink && /^https?:/.test(url)) tg.openLink(url); else window.open(url, '_blank'); }
   function copier(txt) { function repli() { var a = document.createElement('textarea'); a.value = txt; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); } catch (e) {} a.remove(); } if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function () { toast('Texte copié'); }, function () { repli(); toast('Texte copié'); }); else { repli(); toast('Texte copié'); } }
+  function quandMs(ms) { try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(ms)); } catch (e) { return ''; } }
   function wa(tel, texte) { return 'https://wa.me/' + (tel || '') + '?text=' + encodeURIComponent(texte || ''); }
 
   // ---------- Dates ----------
@@ -87,10 +88,12 @@
 
   function cadre(titre) {
     document.getElementById('titre').textContent = titre;
-    var racine = ['accueil', 'agenda', 'cleaners', 'clients', 'plus'].indexOf(vue.v) >= 0 && !pile.length;
+    var racine = ['accueil', 'echanges', 'agenda', 'cleaners', 'clients', 'plus'].indexOf(vue.v) >= 0 && !pile.length;
     document.getElementById('retour').hidden = racine;
     if (tg && tg.BackButton) { if (racine) tg.BackButton.hide(); else tg.BackButton.show(); }
-    Array.prototype.forEach.call(document.querySelectorAll('#onglets button'), function (b) { b.className = b.getAttribute('data-v') === vue.v ? 'actif' : ''; });
+    Array.prototype.forEach.call(document.querySelectorAll('#onglets button'), function (b) { b.className = b.getAttribute('data-v') === (vue.v === 'discussion' ? 'echanges' : vue.v) ? 'actif' : ''; });
+    var nl = (E && E.echanges || []).filter(function (x) { return x.nonlus > 0 && !x.cleaner; }).length, pastille = document.getElementById('nonlus');
+    if (pastille) { pastille.textContent = nl ? String(nl) : ''; pastille.hidden = !nl; }
     document.getElementById('vue-ami').hidden = !(estAdmin(true) && vueAmi);
   }
   function estAdmin(brut) { var a = E && E.moi && E.moi.role === 'admin'; return brut ? a : (a && !vueAmi); }
@@ -344,6 +347,36 @@
       var nc = (E.contacts || []).length;
       app.innerHTML = '<div class="actions"><button class="btn large' + (nc ? ' principal' : '') + '" data-a="aller" data-x="contacts">📥 Contacts sans réservation (' + nc + ')</button><button class="btn" data-a="aller" data-x="series">🔁 Séries</button><button class="btn" data-a="aller" data-x="chiffres">📈 Chiffres</button><button class="btn" data-a="aller" data-x="aide">❓ Les 5 gestes</button><button class="btn large" data-a="aller" data-x="reglages">⚙ Réglages</button></div>';
     },
+    // Échanges WhatsApp : une ligne par client (30 derniers jours), non-lus en haut ; en un toucher, toute la discussion
+    echanges: function () {
+      cadre('Échanges');
+      var l = E.echanges || [];
+      app.innerHTML = '<p class="note">Tous les messages reçus sur le WhatsApp de l’entreprise, avec les réponses du bot et les vôtres. Touchez un client pour lire et répondre.</p>' +
+        (l.length ? l.map(function (c) {
+          var qui = c.dernier.sens === 'client' ? '' : (c.dernier.sens === 'bot' ? '🤖 ' : 'Vous : ');
+          return '<button class="carte ech' + (c.nonlus ? ' nonlu' : '') + '" data-a="discussion" data-x="' + esc(c.wa) + '"><div class="l1"><span dir="auto">' + esc(c.nom || ('+' + c.wa)) + (c.test ? ' (test)' : '') + (c.cleaner ? ' · cherche du travail' : '') + '</span><span class="note">' + esc(quandMs(c.dernier.ts)) + '</span></div>' +
+            '<div class="l2" dir="auto">' + (c.nonlus ? '<b class="pastille">' + c.nonlus + '</b> ' : '') + esc(qui + c.dernier.texte) + '</div>' + (c.ref ? '<div class="l3">Ref ' + esc(c.ref) + '</div>' : '') + '</button>';
+        }).join('') : '<p class="vide">Aucun échange pour l’instant.</p>');
+    },
+    discussion: function () {
+      var c = vue.client || (E.echanges || []).filter(function (x) { return x.wa === vue.wa; })[0] || { wa: vue.wa };
+      cadre(c.nom || ('+' + vue.wa));
+      if (!vue.messages) {
+        app.innerHTML = '<p class="attente">Chargement…</p>';
+        api('echanges_fil', { wa: vue.wa }).then(function (r) { if (vue.v !== 'discussion') return; if (!r.ok) { app.innerHTML = '<p class="vide">' + esc(r.erreur || 'Discussion introuvable') + '</p>'; return; } vue.messages = r.messages; vue.client = r.client; (E.echanges || []).forEach(function (x) { if (x.wa === vue.wa) x.nonlus = 0; }); afficher(); }, function () { app.innerHTML = '<p class="vide">Pas de connexion. Réessayez.</p>'; });
+        return;
+      }
+      var lib = { client: '', bot: '🤖 Bot', gerant: '🧑‍💼 Vous' };
+      app.innerHTML = '<div class="bloc"><div class="note">+' + esc(vue.wa) + (c.ref ? ' · <a href="#" data-a="fiche" data-x="' + esc(c.ref) + '">Ref ' + esc(c.ref) + '</a>' : ' · aucune demande liée') + '</div></div>' +
+        '<div class="fil">' + vue.messages.map(function (m) {
+          return '<div class="bulle ' + esc(m.sens) + '"><div class="qui">' + (lib[m.sens] ? lib[m.sens] + ' · ' : '') + esc(quandMs(m.ts)) + (m.type === 'wa_perso' ? ' · par votre WhatsApp' : '') + '</div><div dir="auto">' + esc(m.texte).replace(/\n/g, '<br>') + '</div></div>';
+        }).join('') + '</div>' +
+        '<div class="bloc"><label class="champ">Votre réponse</label><textarea class="champ" id="reponse" rows="3" dir="auto" placeholder="Écrivez ici…">' + esc(vue.brouillon || '') + '</textarea>' +
+        '<p class="note">' + (c.dans24 ? 'Part sur WhatsApp, depuis le numéro de l’entreprise. Le bot se met en retrait 30 min pour ce client.' : 'Plus de 24 h depuis son dernier message : WhatsApp s’ouvrira avec votre réponse prête, à envoyer depuis votre téléphone.') + '</p>' +
+        '<div class="actions"><button class="btn principal large" data-a="repondre">Envoyer la réponse</button><button class="btn large" data-a="ouvrir" data-x="' + esc(wa(vue.wa, '')) + '">💬 Ouvrir dans WhatsApp</button></div></div>';
+      var ta = $('#reponse'); ta.oninput = function () { vue.brouillon = ta.value; };
+      var f = app.querySelector('.fil'); if (f && f.lastChild && f.lastChild.scrollIntoView) f.lastChild.scrollIntoView({ block: 'end' });
+    },
     // Personnes qui ont écrit au WhatsApp de l'entreprise (14 derniers jours) et n'ont pas réservé
     contacts: function () {
       cadre('Contacts sans réservation');
@@ -402,6 +435,15 @@
     client: function (x) { aller({ v: 'client', id: x }); },
     cleaner: function (x) { aller({ v: 'cleaner', id: x }); },
     aller: function (x) { aller({ v: x }); },
+    discussion: function (x) { aller({ v: 'discussion', wa: x }); },
+    repondre: function (x, el) {
+      var txt = String(($('#reponse') || {}).value || '').trim(); if (!txt) { toast('Écrivez votre réponse', true); return; }
+      el.disabled = true; el.textContent = 'Envoi…';
+      agir('repondre_client', { wa: vue.wa, texte: txt }, function (r) {
+        if (r.url) ouvrir(r.url);
+        vue.brouillon = ''; vue.messages = null; afficher();
+      }).then(function (r) { if (!r || !r.ok) { el.disabled = false; el.textContent = 'Envoyer la réponse'; } });
+    },
     agenda: function (x) { agendaJour = x; VUES.agenda(); lier(); },
     ouvrir: function (x) { ouvrir(x); },
     // Action de l'étape (même liste que la carte) : lien WhatsApp noté puis ouvert, action du bot, ou page de la Mini App
@@ -446,8 +488,8 @@
   var q = new URLSearchParams(location.search);
   var v0 = q.get('v') || 'accueil', r0 = q.get('r') || '';
   if (q.get('f') === 'sans') filtre = 'sansTous';
-  var depart = { accueil: { v: 'accueil' }, attribuer: { v: 'attribuer', r: r0 }, fiche: { v: 'fiche', r: r0 }, decaler: { v: 'decaler', r: r0 }, partager: { v: 'partager', r: r0 }, rereserver: null, nouvelle: { v: 'nouvelle' } }[v0] || { v: 'accueil' };
-  if (r0 && v0 !== 'accueil') pile = [{ v: 'accueil' }, { v: 'fiche', r: r0 }].slice(0, v0 === 'fiche' ? 1 : 2);
+  var depart = { accueil: { v: 'accueil' }, echanges: r0 ? { v: 'discussion', wa: r0 } : { v: 'echanges' }, attribuer: { v: 'attribuer', r: r0 }, fiche: { v: 'fiche', r: r0 }, decaler: { v: 'decaler', r: r0 }, partager: { v: 'partager', r: r0 }, rereserver: null, nouvelle: { v: 'nouvelle' } }[v0] || { v: 'accueil' };
+  if (r0 && v0 !== 'accueil') pile = v0 === 'echanges' ? [{ v: 'echanges' }] : [{ v: 'accueil' }, { v: 'fiche', r: r0 }].slice(0, v0 === 'fiche' ? 1 : 2);
   vue = depart || { v: 'accueil' };
   if (!initData && window.__DEMO) { E = window.__DEMO; afficher(); return; } // aperçu local uniquement
   if (!initData) { app.innerHTML = '<div class="bloc"><b>Ouvrez ce tableau de bord depuis le bot Telegram JeruServices.</b><p class="note">Pour votre sécurité, il ne fonctionne qu’à l’intérieur de Telegram.</p></div>'; return; }

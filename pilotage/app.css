@@ -64,3 +64,15 @@ input.champ,select.champ,textarea.champ{width:100%;padding:10px;border:1px solid
 #toast.ko{background:var(--danger)}
 .groupe{margin:12px 0 6px;font-weight:600;font-size:13.5px;color:var(--gris)}
 .geste{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--trait)}.geste:last-child{border:0}.geste span{font-size:22px}
+
+/* Échanges (16/11) */
+nav#onglets button{position:relative}
+.pastille{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--danger);color:#fff;font-size:12px;line-height:18px;text-align:center;font-weight:700}
+.pastille.onglet{position:absolute;top:2px;left:calc(50% + 6px);font-size:10.5px;line-height:16px;min-width:16px}
+.carte.ech{border-left-color:var(--trait)}.carte.ech.nonlu{border-left-color:var(--bouton)}.carte.ech.nonlu .l1 span:first-child{font-weight:700}
+.fil{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.bulle{max-width:85%;padding:8px 10px;border-radius:12px;background:var(--carte);overflow-wrap:anywhere}
+.bulle.client{align-self:flex-start;border-top-left-radius:4px}
+.bulle.bot{align-self:flex-end;background:var(--fond);border:1px dashed var(--trait);color:var(--gris);font-size:13.5px}
+.bulle.gerant{align-self:flex-end;background:var(--bouton);color:var(--bouton-t);border-top-right-radius:4px}
+.bulle .qui{font-size:11.5px;opacity:.75;margin-bottom:2px}
